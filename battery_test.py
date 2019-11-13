@@ -38,7 +38,6 @@ Node.registry = es
 # create buses
 b_pv = solph.Bus(label='bus_pv')
 b_elec = solph.Bus(label='bus_elec')
-b_grid = solph.Bus(label='bus_grid')
 
 # create pv-systems
 pv = solph.Source(label='pv',
