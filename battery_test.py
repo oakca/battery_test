@@ -14,11 +14,22 @@ import os
 
 
 # timesteps
-timesteps = 10
+timesteps = 60*24
 
 # time index
 date_time_index = pd.date_range('1/1/2019', periods=timesteps,
-                                freq='H')
+                                freq='min')
+
+# import data
+demand_data = pd.read_csv('demand.csv', sep=';').drop(['datetime'], axis=1)
+solar_data = pd.read_csv('solar.csv', sep=';')
+
+# fix for 1 day
+demand_data = demand_data.truncate(after=60*24-1)
+solar_data = solar_data.truncate(after=60*24-1)['Globalstrahlung horizontal ']
+solar_data[0] = 0
+
+import pdb; pdb.set_trace()
 
 # create energy system
 es = solph.EnergySystem(timeindex=date_time_index)
@@ -32,7 +43,7 @@ b_grid = solph.Bus(label='bus_grid')
 # create pv-systems
 pv = solph.Source(label='pv',
                   outputs={b_pv: solph.Flow(
-                      actual_value=0.89,
+                      actual_value=0.5,
                       fixed=True,
                       investment=solph.Investment(
                           ep_costs=10,
@@ -53,11 +64,10 @@ battery = solph.components.GenericStorage(
               outputs={b_elec: solph.Flow(
                   variable_costs=0)},
               investment=solph.Investment(
-                 ep_costs=200*100,
+                 ep_costs=10,
                  maximum=1000,
                  existing=0),
               initial_capacity=1,
-              nominal_storage_capacity=1000,
               inflow_conversion_factor=0.98,
               outflow_conversion_factor=0.98,
               invest_relation_input_capacity=1,
@@ -75,7 +85,7 @@ pv_to_elec = solph.Transformer(label='pte',
 # create demand
 demand = solph.Sink(label='e_demand',
                     inputs={b_elec: solph.Flow(
-                        actual_value=[0,10,20,100,300,1000,2000,2500,100,10],
+                        actual_value=demand_data['P_el'],
                         fixed=True,
                         nominal_value=1)})
 
@@ -94,7 +104,7 @@ model.name = 'Battery Test'
 model.objective.expr.__add__(3000*100)
 
 # solve model
-model.solve(solver='glpk',
+model.solve(solver='cbc',
             solve_kwargs={'logfile': 'log.txt', 'tee': True})
 
 # print objective
@@ -116,7 +126,7 @@ storage_capacity = outputlib.views.node(es.results['main'], 'None')['scalars']
 pv_flow = outputlib.views.node(es.results['main'], 'bus_pv')['sequences']
 pv_invest = outputlib.views.node(es.results['main'], 'bus_pv')['scalars']
 
-demand = outputlib.views.node(es.results['main'], 'e_demand')['sequences'] 
+demand = outputlib.views.node(es.results['main'], 'e_demand')['sequences']
 grid_export = outputlib.views.node(es.results['main'], 'grid_exp')['sequences'] # -9cent
 grid_import = outputlib.views.node(es.results['main'], 'grid_imp')['sequences'] # +20cent
 
